@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>YOLOv8 Video Object Detection</title>
+    <style>
+        canvas {
+            display: block;
+            border: 1px solid black;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <video id="video" width="640" height="480" autoplay></video>
+    <canvas id="canvas" width="640" height="480"></canvas>
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Get access to the camera
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: true }).then(function(stream) {
+                video.srcObject = stream;
+                video.play();
+            });
+        }
+
+        async function detectObjects(frame) {
+            const data = new FormData();
+            data.append("image_file", frame, "frame.jpg");
+
+            const response = await fetch("/detect", {
+                method: "post",
+                body: data
+            });
+
+            return response.json();
+        }
+
+        function drawBoxes(boxes) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = "#00FF00";
+            ctx.lineWidth = 3;
+            ctx.font = "18px serif";
+
+            boxes.forEach(([x1, y1, x2, y2, label]) => {
+                ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+                ctx.fillStyle = "#00ff00";
+                const width = ctx.measureText(label).width;
+                ctx.fillRect(x1, y1, width + 10, 25);
+                ctx.fillStyle = "#000000";
+                ctx.fillText(label, x1, y1 + 18);
+            });
+        }
+
+        function captureFrame() {
+            const frame = canvas.toDataURL('image/jpeg');
+            const blob = dataURLtoBlob(frame);
+
+            detectObjects(blob).then(boxes => {
+                drawBoxes(boxes);
+            });
+        }
+
+        function dataURLtoBlob(dataurl) {
+            var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
+                bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+            while (n--) {
+                u8arr[n] = bstr.charCodeAt(n);
+            }
+            return new Blob([u8arr], {type:mime});
+        }
+
+        // Capture frames at an interval
+        setInterval(captureFrame, 500); // Adjust the interval as needed
+    </script>
+</body>
+</html>
